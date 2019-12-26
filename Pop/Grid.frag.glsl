@@ -51,7 +51,12 @@ float3 GetNumberColour(int Number,float Max,float2 LocalUv)
 	if ( Number == 0 )
 		return Bg;
 	
-	
+	float Border = 0.3;
+	LocalUv.x = mix( -Border, 1+Border, LocalUv.x);
+	LocalUv.y = mix( -Border, 1+Border, LocalUv.y);
+	if ( LocalUv.x < 0.0 || LocalUv.x > 1.0 || LocalUv.y < 0.0 || LocalUv.y > 1.0 )
+		return Bg;
+
 	//	todo: add border to LocalUv
 	float2 FontUv = GetFontUv( Number, LocalUv );
 	float FontSample = texture2D( FontTexture, FontUv ).x;
