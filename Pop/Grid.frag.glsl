@@ -44,26 +44,60 @@ float2 GetFontUv(int Number,float2 LocalUv)
 	return float2(u,v);
 }
 
-float3 GetNumberColour(int Number,float Max,float2 LocalUv)
+
+#define Whitef		1.0
+#define LightGreyf	0.8
+#define MidGreyf	0.6
+#define DarkGreyf	0.4
+#define Blackf		0.0
+#define White		float3(Whitef,Whitef,Whitef)
+#define LightGrey	float3(LightGreyf,LightGreyf,LightGreyf)
+#define MidGrey		float3(MidGreyf,MidGreyf,MidGreyf)
+#define DarkGrey	float3(DarkGreyf,DarkGreyf,DarkGreyf)
+#define Black		float3(Blackf,Blackf,Blackf)
+
+float3 GetNumberColour(int Number,bool Pressed,float2 LocalUv)
 {
-	float3 Bg = float3(0.7,0.7,0.7);
-	float3 Fg = float3(0,0,1);
-	if ( Number == 0 )
-		return Bg;
+	float3 HighOut = Pressed ? Black : White;
+	float3 HighIn = Pressed ? DarkGrey : LightGrey;
+	float3 LowOut = Pressed ? White : Black;
+	float3 LowIn = Pressed ? LightGrey : DarkGrey;
+	float3 Inside = MidGrey;
+	float Border = 0.2;
+	float InnerBorder = 0.4;
+	//if ( !Pressed )
+	{
+		//if ( LocalUv.x < Border || LocalUv.y < Border )
+		//	return LightGrey;
+	}
 	
-	float Border = 0.3;
+	float3 FontColour = float3(0,0,1);
 	LocalUv.x = mix( -Border, 1+Border, LocalUv.x);
 	LocalUv.y = mix( -Border, 1+Border, LocalUv.y);
-	if ( LocalUv.x < 0.0 || LocalUv.x > 1.0 || LocalUv.y < 0.0 || LocalUv.y > 1.0 )
-		return Bg;
+	/*
+	if ( LocalUv.x < -Border/2.0 || LocalUv.y < -Border/2.0 )
+		return HighOut;
+	if ( LocalUv.x > 1+(Border/2.0) || LocalUv.y > 1+(Border/2.0) )
+		return LowOut;
+	 */
+	if ( min(LocalUv.x,LocalUv.y) < 0.0 )
+		return HighIn;
+	if ( max(LocalUv.x,LocalUv.y) > 1.0 )
+		return LowIn;
 
+	LocalUv.x = mix( -InnerBorder, 1+InnerBorder, LocalUv.x);
+	LocalUv.y = mix( -InnerBorder, 1+InnerBorder, LocalUv.y);
+	if ( LocalUv.x < 0.0 || LocalUv.y < 0.0 )
+		return Inside;
+	if ( LocalUv.x > 1.0 || LocalUv.y > 1.0 )
+		return Inside;
+
+	if ( Number == 0 || !Pressed )
+		return Inside;
 	//	todo: add border to LocalUv
 	float2 FontUv = GetFontUv( Number, LocalUv );
 	float FontSample = texture2D( FontTexture, FontUv ).x;
-	return mix( Bg, Fg, FontSample );
-	
-	float Normal = float(Number) / Max;
-	return GetNormalYellowGreenBlue(Normal);
+	return mix( MidGrey, FontColour, FontSample );
 }
 
 
@@ -82,8 +116,8 @@ void main()
 		float2 xy = uv * GridSize;
 		float2 LocalUv = fract( xy );
 		gl_FragColor = float4(LocalUv,0,1);
-		
-		gl_FragColor = float4( GetNumberColour(NeighbourCount,8,LocalUv), 1 );
+		bool Pressed = true;
+		gl_FragColor = float4( GetNumberColour(NeighbourCount,Pressed,LocalUv), 1 );
 		if ( NeighbourCount == 0 )
 			gl_FragColor = float4( 0.7, 0.7, 0.7, 1 );
 	}
