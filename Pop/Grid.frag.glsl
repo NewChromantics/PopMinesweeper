@@ -5,12 +5,16 @@ uniform sampler2D Texture;
 uniform sampler2D FontTexture;
 uniform float2 GridSize;
 
+#define STATE_HIDDEN	0
+#define STATE_REVEALED	1
 
-void GetGridValue(out int NeighbourCount,out bool IsMine)
+void GetGridValue(out int NeighbourCount,out bool IsMine,out bool IsHidden)
 {
 	float4 Sample = texture2D( Texture, uv );
-	IsMine = (Sample.y > 0);
 	NeighbourCount = int(floor(Sample.x * 256.0));
+	int State = int(floor(Sample.y * 256.0));
+	IsMine = NeighbourCount == 255;
+	IsHidden = State == STATE_HIDDEN;
 }
 
 float Range(float Min,float Max,float Value)
@@ -63,7 +67,7 @@ float3 GetNumberColour(int Number,bool Pressed,float2 LocalUv)
 	float3 LowOut = Pressed ? White : Black;
 	float3 LowIn = Pressed ? LightGrey : DarkGrey;
 	float3 Inside = MidGrey;
-	float Border = 0.2;
+	float Border = 0.1;
 	float InnerBorder = 0.4;
 	//if ( !Pressed )
 	{
@@ -100,27 +104,34 @@ float3 GetNumberColour(int Number,bool Pressed,float2 LocalUv)
 	return mix( MidGrey, FontColour, FontSample );
 }
 
+float3 GetBombColour(float2 uv)
+{
+	const float BombRadius = 0.3;
+	float Distance = length( uv - float2(0.5,0.5) );
+	if ( Distance > BombRadius )
+		return MidGrey;
+	return Black;
+}
 
 void main()
 {
 	int NeighbourCount;
 	bool IsMine;
-	GetGridValue( NeighbourCount, IsMine );
+	bool IsHidden;
+	GetGridValue( NeighbourCount, IsMine, IsHidden );
+	float2 xy = uv * GridSize;
+	float2 LocalUv = fract( xy );
 
-	if ( IsMine )
+	if ( IsMine && !IsHidden )
 	{
-		gl_FragColor = float4(1,0,0,1);
+		gl_FragColor.xyz = GetBombColour( LocalUv );
 	}
 	else
 	{
-		float2 xy = uv * GridSize;
-		float2 LocalUv = fract( xy );
 		gl_FragColor = float4(LocalUv,0,1);
-		bool Pressed = true;
-		gl_FragColor = float4( GetNumberColour(NeighbourCount,Pressed,LocalUv), 1 );
-		if ( NeighbourCount == 0 )
-			gl_FragColor = float4( 0.7, 0.7, 0.7, 1 );
+		gl_FragColor.xyz = GetNumberColour(NeighbourCount,IsHidden,LocalUv);
 	}
+	gl_FragColor.w = 1;
 	/*
 	float4 Sample = texture2D( Texture, uv );
 	Sample.x = Sample.x != 0 ? 1 : 0;

@@ -45,6 +45,12 @@ function CountNeighbours(ThisCoord,MineCoords)
 	return NeighbourCount;
 }
 
+//	constants, as class' don't currently have static fields
+const MinesweeperGridState = {};
+MinesweeperGridState.Hidden = 'Hidden';
+MinesweeperGridState.Revealed = 'Revealed';
+//MinesweeperGridState.Flagged = 'Flagged';	//	flagged p1, flagged p2 etc
+
 class MinesweeperGame
 {
 	constructor(Width,Height,MineCount)
@@ -69,8 +75,10 @@ class MinesweeperGame
 		function InitCell(x,y)
 		{
 			//	work out if the cell is a number or a mine, or nothing
-			const Neighbours = CountNeighbours( [x,y], MineCoords );
-			return Neighbours;
+			const CellState = {};
+			CellState.Neighbours = CountNeighbours( [x,y], MineCoords );
+			CellState.State = MinesweeperGridState.Hidden;
+			return CellState;
 		}
 		
 		this.Map = MakeDoubleArray( Width, Height, InitCell );
@@ -82,9 +90,46 @@ class MinesweeperGame
 		return false;
 	}
 	
-	//	runs one iteration of the game loop
-	async Iteration(OnStateChanged)
+	ClickCoord(xy)
 	{
-		OnStateChanged(this);
+		const x = xy[0];
+		const y = xy[1];
+		const GridSize = this.GetGridSize();
+
+		//	check bounds
+		if ( x < 0 || x >= GridSize[0] )
+			throw `x clicked out of bounds ${x} / ${GridSize[0]}`;
+		if ( y < 0 || y >= GridSize[1] )
+			throw `y clicked out of bounds ${y} / ${GridSize[1]}`;
+
+		//	get cell
+		const Cell = this.Map[x][y];
+		
+		//	check can be clicked
+		if ( Cell.State != MinesweeperGridState.Hidden )
+			throw `Clicked cell ${x},${y} state not hidden ${Cell.State}`;
+	
+		//	reveal it
+		Cell.State = MinesweeperGridState.Revealed;
+		
+		//	todo: flood fill reveal if Cell.Neighbours == 0
+		//	todo: Death if clicked mine (and 1 player)
+	}
+	
+	//	runs one iteration of the game loop
+	async Iteration(GetNextClickedCoord,OnStateChanged)
+	{
+		const NextCoord = await GetNextClickedCoord();
+		try
+		{
+			ClickCoord(xy);
+			//	if player did a go, change to next player if multiplayer etc
+			OnStateChanged(this);
+		}
+		catch(e)
+		{
+			//	show errors/sound etc
+			Pop.Debug(e);
+		}
 	}
 }

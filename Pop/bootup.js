@@ -34,7 +34,7 @@ function LoadFontTexture(RenderTarget)
 	const FontChars = Pop.LoadFileAsString('Font.txt').split('');
 	let FontPixels = FontChars.map( FontCharToPixel );
 	FontPixels = FontPixels.filter( x => x!==undefined );
-	Pop.Debug(FontPixels);
+	//Pop.Debug(FontPixels);
 
 	const Image = new Pop.Image();
 	Image.WritePixels( 3, 5*10, FontPixels, 'Greyscale' );
@@ -48,6 +48,7 @@ const BlitQuadShader = RegisterShaderAssetFilename('Blit.frag.glsl','Quad.vert.g
 const GridQuadShader = RegisterShaderAssetFilename('Grid.frag.glsl','Quad.vert.glsl');
 
 var ResetGameFlag = false;
+var WindowGridRect = null;
 
 function OnParamsChanged(Params,ChangedParam)
 {
@@ -131,6 +132,7 @@ Window.OnRender = function (RenderTarget)
 		Uniforms['FontTexture'] = GetAsset('Font',RenderTarget);
 		Uniforms['GridSize'] = [Params.GridWidth,Params.GridHeight];
 		RenderTexture(RenderTarget,GridPixelsTexture,Rect,Uniforms,GridQuadShader);
+		WindowGridRect = Rect;
 	}
 
 	//	todo: show gui
@@ -138,6 +140,7 @@ Window.OnRender = function (RenderTarget)
 		
 }
 Window.OnMouseMove = function () { };
+Window.OnMouseClick = OnMouseClick;
 
 
 function OnGameStateChanged(Game)
@@ -158,16 +161,56 @@ function OnGameStateChanged(Game)
 		{
 			let PixelIndex = (y * GridPixels.Width) + x;
 			PixelIndex *= ComponentCount;
-			const NeighbourCount = Grid[x][y];
-			const IsMine = (Grid[x][y]===true);
+			const Cell = Grid[x][y];
+			const NeighbourCount = Cell.NeighbourCount;
+			const IsMine = (NeighbourCount===true);
+			const StateValue = (Cell.State == MinesweeperGridState.Hidden) ? 0 : 1;
 			//	is flagged, is exploded etc
-			Pixels[PixelIndex+0] = NeighbourCount;
-			Pixels[PixelIndex+1] = IsMine;
+			Pixels[PixelIndex+0] = IsMine ? 255 : Cell.NeighbourCount;
+			Pixels[PixelIndex+1] = StateValue;
 			Pixels[PixelIndex+2] = 0;
 			Pixels[PixelIndex+3] = 255;
 		}
 	}
 	GridPixels.Pixels = Pixels;
+}
+
+
+//	gr: is this the wrong way around?
+//		this is a list of waiting mouse requests,
+//		so will only respond once the user has clicked,
+//		(only clicking after requests/ready) instead of
+//		catching pending ones (ie, clicking faster than logic)
+//	likely there will only ever be one entry in this queue
+let PendingMouseClickPromises = [];
+
+function WindowPosToGridPos(WindowPos)
+{
+	let x = WindowPos[0] - WindowGridRect[0];
+	let y = WindowPos[1] - WindowGridRect[1];
+	if ( Win)
+	WindowGridRect
+}
+
+function OnMouseClick(Windowx,Windowy)
+{
+	const WindowPos = [Windowx,Windowy];
+	
+	//	if no promises, nothing is waiting for a click
+	//	play an error sound
+	if ( !PendingMouseClickPromises.length )
+		return;
+	
+	const GridPos = WindowPosToGridPos(WindowPos);
+	const ClickPromise = PendingMouseClickPromises.splice(0,1)[0];
+	ClickPromise.Resolve( GridPos );
+}
+
+async function GetNextClickCoord()
+{
+	const Promise = Pop.CreatePromise();
+	PendingMouseClickPromises.push( Promise );
+	return Promise;
 }
 
 async function AppLoop()
@@ -176,10 +219,11 @@ async function AppLoop()
 	{
 		ResetGameFlag = false;
 		const Game = new MinesweeperGame( Params.GridWidth, Params.GridHeight, Params.GridMineCount );
+		OnGameStateChanged( Game );
 		while ( !ResetGameFlag )
 		{
 			await Pop.Yield(100);
-			await Game.Iteration( OnGameStateChanged );
+			await Game.Iteration( GetNextClickCoord, OnGameStateChanged );
 			if ( Game.IsFinished() )
 				break;
 		}
