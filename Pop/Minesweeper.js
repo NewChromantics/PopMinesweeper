@@ -55,15 +55,28 @@ class MinesweeperGame
 {
 	constructor(Width,Height,MineCount)
 	{
-		this.CreateMap(Width,Height,MineCount);
+		this.Width = Width;
+		this.Height = Height;
+		this.MineCount = MineCount;
+		this.Map = null;
 	}
-	
-	CreateMap(Width,Height,MineCount)
+
+	CreateMap(ExcludeXy)
 	{
 		//	make list of mine positions by making an array of all cords and picking some out
-		let AllCoords = GetAllCoords(Width,Height);
+		let AllCoords = GetAllCoords(this.Width,this.Height);
+		
+		if ( ExcludeXy )
+		{
+			function MatchExcluded(xy)
+			{
+				return (xy[0] == ExcludeXy[0]) && (xy[1] == ExcludeXy[1]);
+			}
+			AllCoords.filter( xy => !MatchExcluded(xy) );
+		}
+		
 		let MineCoords = [];
-		for ( let i=0;	i<MineCount;	i++ )
+		for ( let i=0;	i<this.MineCount;	i++ )
 		{
 			//	pop random coord
 			const RandomIndex = Math.floor( Math.random() * AllCoords.length );
@@ -81,15 +94,13 @@ class MinesweeperGame
 			return CellState;
 		}
 		
-		this.Map = MakeDoubleArray( Width, Height, InitCell );
+		this.Map = MakeDoubleArray( this.Width, this.Height, InitCell );
 		Pop.Debug("Map",this.Map);
 	}
 	
 	GetGridSize()
 	{
-		const w = this.Map.length;
-		const h = this.Map[0].length;
-		return [w,h];
+		return [this.Width,this.Height];
 	}
 	
 	IsFinished()
@@ -169,6 +180,14 @@ class MinesweeperGame
 	{
 		OnStateChanged(this);
 		const NextCoord = await GetNextClickedCoord();
+		
+		//	first click initialises map but no bombs at first pos
+		if ( !this.Map )
+		{
+			this.CreateMap(NextCoord);
+			OnStateChanged(this);
+		}
+		
 		try
 		{
 			await this.ClickCoord(NextCoord);

@@ -155,21 +155,26 @@ function OnGameStateChanged(Game)
 {
 	//	turn the game grid into a pixel map
 	const Grid = Game.Map;
-	const PixelCount = Grid.length * Grid[0].length;
+	const GridSize = Game.GetGridSize();
+	const PixelCount = GridSize[0] * GridSize[1];
 	const ComponentCount = 4;
 	const Pixels = new Uint8Array( new Array(ComponentCount*PixelCount) );
 	GridPixels = {};
-	GridPixels.Width = Grid.length;
-	GridPixels.Height = Grid[0].length;
+	GridPixels.Width = GridSize[0];
+	GridPixels.Height = GridSize[1];
 	GridPixels.Format = 'RGBA';
 
+	const NullCell = {};
+	NullCell.Neighbours = 0;
+	NullCell.State = MinesweeperGridState.Hidden;
+	
 	for ( let x=0;	x<GridPixels.Width;	x++ )
 	{
 		for ( let y=0;	y<GridPixels.Height;	y++ )
 		{
 			let PixelIndex = (y * GridPixels.Width) + x;
 			PixelIndex *= ComponentCount;
-			const Cell = Grid[x][y];
+			const Cell = Grid ? Grid[x][y] : NullCell;
 			const NeighbourCount = Cell.Neighbours;
 			const IsMine = (NeighbourCount===true);
 			const StateValue = (Cell.State == MinesweeperGridState.Hidden) ? 0 : 1;
