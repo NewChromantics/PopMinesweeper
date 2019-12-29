@@ -7,6 +7,7 @@ Pop.Include('PopEngineCommon/PopMath.js');
 Pop.Include('PopEngineCommon/PopShaderCache.js');
 Pop.Include('PopEngineCommon/ParamsWindow.js');
 Pop.Include('PopEngineCommon/PopFrameCounter.js');
+Pop.Include('PopEngineCommon/PopApi.js');
 
 Pop.Include('Minesweeper.js');
 Pop.Include('AssetManager.js');
@@ -36,8 +37,11 @@ function LoadFontTexture(RenderTarget)
 	FontPixels = FontPixels.filter( x => x!==undefined );
 	//Pop.Debug(FontPixels);
 
+	const FontWidth = 4;
+	const FontHeight = 5;
+	const FontCharCount = 11;
 	const Image = new Pop.Image();
-	Image.WritePixels( 3, 5*10, FontPixels, 'Greyscale' );
+	Image.WritePixels( FontWidth, FontHeight*FontCharCount, FontPixels, 'Greyscale' );
 	return Image;
 }
 
@@ -133,6 +137,10 @@ Window.OnRender = function (RenderTarget)
 		Uniforms['GridSize'] = [Params.GridWidth,Params.GridHeight];
 		RenderTexture(RenderTarget,GridPixelsTexture,Rect,Uniforms,GridQuadShader);
 		WindowGridRect = Rect;
+		WindowGridRect[0] *= RenderTargetRect[2];
+		WindowGridRect[1] *= RenderTargetRect[3];
+		WindowGridRect[2] *= RenderTargetRect[2];
+		WindowGridRect[3] *= RenderTargetRect[3];
 	}
 
 	//	todo: show gui
@@ -140,7 +148,7 @@ Window.OnRender = function (RenderTarget)
 		
 }
 Window.OnMouseMove = function () { };
-Window.OnMouseClick = OnMouseClick;
+Window.OnMouseDown = OnMouseDown;
 
 
 function OnGameStateChanged(Game)
@@ -162,11 +170,11 @@ function OnGameStateChanged(Game)
 			let PixelIndex = (y * GridPixels.Width) + x;
 			PixelIndex *= ComponentCount;
 			const Cell = Grid[x][y];
-			const NeighbourCount = Cell.NeighbourCount;
+			const NeighbourCount = Cell.Neighbours;
 			const IsMine = (NeighbourCount===true);
 			const StateValue = (Cell.State == MinesweeperGridState.Hidden) ? 0 : 1;
 			//	is flagged, is exploded etc
-			Pixels[PixelIndex+0] = IsMine ? 255 : Cell.NeighbourCount;
+			Pixels[PixelIndex+0] = IsMine ? 255 : NeighbourCount;
 			Pixels[PixelIndex+1] = StateValue;
 			Pixels[PixelIndex+2] = 0;
 			Pixels[PixelIndex+3] = 255;
@@ -184,24 +192,49 @@ function OnGameStateChanged(Game)
 //	likely there will only ever be one entry in this queue
 let PendingMouseClickPromises = [];
 
-function WindowPosToGridPos(WindowPos)
+function WindowPosToGridPos(WindowPos,ValueIfOutOfBounds=undefined)
 {
-	let x = WindowPos[0] - WindowGridRect[0];
-	let y = WindowPos[1] - WindowGridRect[1];
-	if ( Win)
-	WindowGridRect
+	//	rescale window grid rect?
+	Pop.Debug( WindowPos, "x", WindowGridRect );
+	//	get normalised
+	let x = Math.Range( WindowGridRect[0], WindowGridRect[0] + WindowGridRect[2], WindowPos[0] );
+	let y = Math.Range( WindowGridRect[1], WindowGridRect[1] + WindowGridRect[3], WindowPos[1] );
+
+	//	rescale to grid
+	const gw = Params.GridWidth;
+	const gh = Params.GridHeight;
+	x = Math.floor( x * gw );
+	y = Math.floor( y * gh );
+	
+	//	reject oob
+	if ( ValueIfOutOfBounds !== undefined )
+	{
+		if ( x < 0 || x >= gw )	return ValueIfOutOfBounds;
+		if ( y < 0 || y >= gh )	return ValueIfOutOfBounds;
+	}
+
+	return [x,y];
 }
 
-function OnMouseClick(Windowx,Windowy)
+function OnMouseDown(Windowx,Windowy)
 {
 	const WindowPos = [Windowx,Windowy];
 	
 	//	if no promises, nothing is waiting for a click
 	//	play an error sound
 	if ( !PendingMouseClickPromises.length )
+	{
+		Pop.Debug("No pending click requests");
 		return;
+	}
 	
-	const GridPos = WindowPosToGridPos(WindowPos);
+	const GridPos = WindowPosToGridPos(WindowPos, false);
+	if ( !GridPos )
+	{
+		Pop.Debug("Grid pos out of bounds");
+		return;
+	}
+	
 	const ClickPromise = PendingMouseClickPromises.splice(0,1)[0];
 	ClickPromise.Resolve( GridPos );
 }

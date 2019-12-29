@@ -7,13 +7,35 @@ uniform float2 GridSize;
 
 #define STATE_HIDDEN	0
 #define STATE_REVEALED	1
+#define MINE_NUMBER		255
+#define FONT_CHAR_COUNT	11
+
+float3 GetNumberColour(int Number)
+{
+	float f = 1.0;
+	float h = 0.7;
+	float l = 0.5;
+	float3 Colours[10];
+	Colours[0] = float3(0,0,0);
+	Colours[1] = float3(0,0,f);
+	Colours[2] = float3(h,0,0);
+	Colours[3] = float3(0,l,0);
+	Colours[4] = float3(f,h,0);
+	Colours[5] = float3(h,0,h);
+	Colours[6] = float3(0,f,0);
+	Colours[7] = float3(f,0,0);
+	Colours[7] = float3(f,0,0);
+	Colours[8] = float3(f,f,0);
+
+	return Colours[ Number % 10 ];
+}
 
 void GetGridValue(out int NeighbourCount,out bool IsMine,out bool IsHidden)
 {
 	float4 Sample = texture2D( Texture, uv );
-	NeighbourCount = int(floor(Sample.x * 256.0));
-	int State = int(floor(Sample.y * 256.0));
-	IsMine = NeighbourCount == 255;
+	NeighbourCount = int(floor(Sample.x * 255.0));
+	int State = int(floor(Sample.y * 255.0));
+	IsMine = NeighbourCount == MINE_NUMBER;
 	IsHidden = State == STATE_HIDDEN;
 }
 
@@ -44,7 +66,7 @@ float3 GetNormalYellowGreenBlue(float Normal)
 float2 GetFontUv(int Number,float2 LocalUv)
 {
 	float u = LocalUv.x;
-	float v = (Number+LocalUv.y) / 10.0;
+	float v = (Number+LocalUv.y) / float(FONT_CHAR_COUNT);
 	return float2(u,v);
 }
 
@@ -60,12 +82,14 @@ float2 GetFontUv(int Number,float2 LocalUv)
 #define DarkGrey	float3(DarkGreyf,DarkGreyf,DarkGreyf)
 #define Black		float3(Blackf,Blackf,Blackf)
 
-float3 GetNumberColour(int Number,bool Pressed,float2 LocalUv)
+
+float3 GetNumberColour(int Number,bool Hidden,float2 LocalUv)
 {
-	float3 HighOut = Pressed ? Black : White;
-	float3 HighIn = Pressed ? DarkGrey : LightGrey;
-	float3 LowOut = Pressed ? White : Black;
-	float3 LowIn = Pressed ? LightGrey : DarkGrey;
+	//	highlight/lowlight
+	float3 HighOut = !Hidden ? Black : White;
+	float3 HighIn = !Hidden ? DarkGrey : LightGrey;
+	float3 LowOut = !Hidden ? White : Black;
+	float3 LowIn = !Hidden ? LightGrey : DarkGrey;
 	float3 Inside = MidGrey;
 	float Border = 0.1;
 	float InnerBorder = 0.4;
@@ -75,7 +99,6 @@ float3 GetNumberColour(int Number,bool Pressed,float2 LocalUv)
 		//	return LightGrey;
 	}
 	
-	float3 FontColour = float3(0,0,1);
 	LocalUv.x = mix( -Border, 1+Border, LocalUv.x);
 	LocalUv.y = mix( -Border, 1+Border, LocalUv.y);
 	/*
@@ -96,22 +119,20 @@ float3 GetNumberColour(int Number,bool Pressed,float2 LocalUv)
 	if ( LocalUv.x > 1.0 || LocalUv.y > 1.0 )
 		return Inside;
 
-	if ( Number == 0 || !Pressed )
+	if ( Number == 0 || Hidden )
+	{
 		return Inside;
-	//	todo: add border to LocalUv
+	}
+
+	if ( Number == MINE_NUMBER )
+		Number = 10;
+	
+	float3 FontColour = GetNumberColour(Number);
 	float2 FontUv = GetFontUv( Number, LocalUv );
 	float FontSample = texture2D( FontTexture, FontUv ).x;
 	return mix( MidGrey, FontColour, FontSample );
 }
 
-float3 GetBombColour(float2 uv)
-{
-	const float BombRadius = 0.3;
-	float Distance = length( uv - float2(0.5,0.5) );
-	if ( Distance > BombRadius )
-		return MidGrey;
-	return Black;
-}
 
 void main()
 {
@@ -122,15 +143,8 @@ void main()
 	float2 xy = uv * GridSize;
 	float2 LocalUv = fract( xy );
 
-	if ( IsMine && !IsHidden )
-	{
-		gl_FragColor.xyz = GetBombColour( LocalUv );
-	}
-	else
-	{
-		gl_FragColor = float4(LocalUv,0,1);
-		gl_FragColor.xyz = GetNumberColour(NeighbourCount,IsHidden,LocalUv);
-	}
+	gl_FragColor = float4(LocalUv,0,1);
+	gl_FragColor.xyz = GetNumberColour(NeighbourCount,IsHidden,LocalUv);
 	gl_FragColor.w = 1;
 	/*
 	float4 Sample = texture2D( Texture, uv );

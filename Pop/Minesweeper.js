@@ -85,6 +85,13 @@ class MinesweeperGame
 		Pop.Debug("Map",this.Map);
 	}
 	
+	GetGridSize()
+	{
+		const w = this.Map.length;
+		const h = this.Map[0].length;
+		return [w,h];
+	}
+	
 	IsFinished()
 	{
 		return false;
@@ -119,10 +126,11 @@ class MinesweeperGame
 	//	runs one iteration of the game loop
 	async Iteration(GetNextClickedCoord,OnStateChanged)
 	{
+		OnStateChanged(this);
 		const NextCoord = await GetNextClickedCoord();
 		try
 		{
-			ClickCoord(xy);
+			this.ClickCoord(NextCoord);
 			//	if player did a go, change to next player if multiplayer etc
 			OnStateChanged(this);
 		}
