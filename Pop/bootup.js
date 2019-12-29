@@ -60,9 +60,9 @@ function OnParamsChanged(Params,ChangedParam)
 }
 
 var Params = {};
-Params.GridWidth = 10;
-Params.GridHeight = 10;
-Params.GridMineCount = 4;
+Params.GridWidth = 12;
+Params.GridHeight = 12;
+Params.GridMineCount = 10;
 
 var ParamsWindow = CreateParamsWindow(Params, OnParamsChanged);
 ParamsWindow.AddParam('GridWidth',1,200,Math.floor);

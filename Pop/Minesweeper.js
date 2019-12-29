@@ -97,7 +97,41 @@ class MinesweeperGame
 		return false;
 	}
 	
-	ClickCoord(xy)
+	//	probably should re-use clickcoord...
+	async FloodReveal(x,y)
+	{
+		const Cell = this.Map[x][y];
+		//	already exposed
+		if ( Cell.State != MinesweeperGridState.Hidden )
+			return;
+
+		//	reveal it
+		Cell.State = MinesweeperGridState.Revealed;
+		
+		const SafeClick = async function(x,y)
+		{
+			try
+			{
+				await this.ClickCoord([x,y]);
+			}
+			catch(e)
+			{
+			}
+		}.bind(this);
+
+		//	click neighbours
+		await SafeClick(x-1,y-1);
+		await SafeClick(x+0,y-1);
+		await SafeClick(x+1,y-1);
+		await SafeClick(x-1,y+0);
+		//SafeClick(x+0,y+0);
+		await SafeClick(x+1,y+0);
+		await SafeClick(x-1,y+1);
+		await SafeClick(x+0,y+1);
+		await SafeClick(x+1,y+1);
+	}
+	
+	async ClickCoord(xy,OnStateChanged)
 	{
 		const x = xy[0];
 		const y = xy[1];
@@ -116,8 +150,15 @@ class MinesweeperGame
 		if ( Cell.State != MinesweeperGridState.Hidden )
 			throw `Clicked cell ${x},${y} state not hidden ${Cell.State}`;
 	
-		//	reveal it
-		Cell.State = MinesweeperGridState.Revealed;
+		//	flood fill reveal
+		if ( Cell.Neighbours == 0 )
+		{
+			await this.FloodReveal( x,y );
+		}
+		else
+		{
+			Cell.State = MinesweeperGridState.Revealed;
+		}
 		
 		//	todo: flood fill reveal if Cell.Neighbours == 0
 		//	todo: Death if clicked mine (and 1 player)
@@ -130,7 +171,7 @@ class MinesweeperGame
 		const NextCoord = await GetNextClickedCoord();
 		try
 		{
-			this.ClickCoord(NextCoord);
+			await this.ClickCoord(NextCoord);
 			//	if player did a go, change to next player if multiplayer etc
 			OnStateChanged(this);
 		}
